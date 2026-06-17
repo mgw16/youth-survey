@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Youth Survey — Results Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --brand: #00A651; --brand-dark: #007A3D; --brand-light: #E8F7F0; --brand-mid: #4DC489;
+    --navy: #1A1F3A; --navy-mid: #2C3358;
+    --white: #FFFFFF; --bg: #F0F5F2; --border: #D4E8DC;
+    --text: #1A1F3A; --muted: #6B7280;
+    --shadow: 0 2px 12px rgba(0,100,50,0.08);
+    --amber: #F59E0B;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 240px; flex-shrink: 0; background: var(--navy); position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-logo { padding: 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
+  .sidebar-mark { width: 34px; height: 34px; border-radius: 8px; background: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .sidebar-title { font-size: 14px; font-weight: 700; color: white; }
+  .sidebar-sub { font-size: 10px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; }
+  .sidebar-section { padding: 20px 16px 8px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 8px; margin: 2px 8px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s; }
+  .sidebar-link:hover, .sidebar-link.active { background: rgba(255,255,255,0.1); color: white; }
+  .sidebar-link.active { color: #6EE7B7; }
+  .sidebar-count { margin-left: auto; background: var(--brand); color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 40px; }
+
+  .main { flex: 1; overflow-x: hidden; }
+  .topbar { background: white; border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar-title { font-family: 'Lora', serif; font-size: 1.2rem; font-weight: 700; color: var(--navy); }
+  .topbar-actions { display: flex; gap: 10px; }
+  .btn-sm { padding: 8px 16px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-green { background: var(--brand); color: white; }
+  .btn-green:hover { background: var(--brand-dark); }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--muted); }
+  .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+
+  .content { padding: 24px 28px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+  .stat-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stat-value { font-size: 2rem; font-weight: 800; color: var(--navy); line-height: 1; margin-bottom: 4px; }
+  .stat-sub { font-size: 12px; color: var(--muted); }
+  .stat-pill { display: inline-flex; align-items: center; gap: 4px; background: var(--brand-light); color: var(--brand-dark); border-radius: 40px; padding: 3px 9px; font-size: 11px; font-weight: 600; }
+
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
+  .chart-title { font-family: 'Lora', serif; font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+  .chart-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-tall { position: relative; height: 280px; }
+
+  .rank-table { width: 100%; }
+  .rank-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-pos { width: 24px; height: 24px; border-radius: 6px; background: var(--brand); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rank-bar-wrap { flex: 1; }
+  .rank-bar-label { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .rank-bar-track { height: 8px; background: var(--brand-light); border-radius: 4px; }
+  .rank-bar-fill { height: 100%; background: var(--brand); border-radius: 4px; transition: width 1s ease; }
+  .rank-score { font-size: 13px; font-weight: 700; color: var(--brand-dark); width: 40px; text-align: right; }
+
+  .quotes-list { display: flex; flex-direction: column; gap: 12px; }
+  .quote-card { background: var(--brand-light); border-left: 3px solid var(--brand); border-radius: 0 10px 10px 0; padding: 14px 16px; }
+  .quote-text { font-size: 0.9rem; color: var(--navy); line-height: 1.55; font-style: italic; }
+  .quote-meta { font-size: 11px; color: var(--muted); margin-top: 6px; font-weight: 600; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; background: var(--bg); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .tag { display: inline-block; background: var(--brand-light); color: var(--brand-dark); border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; margin: 2px 2px 2px 0; }
+
+  .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; color: var(--muted); }
+  .loading-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 60px 24px; text-align: center; color: var(--muted); }
+  .empty-state .em-icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-family: 'Lora', serif; font-size: 1.2rem; color: var(--navy); margin-bottom: 8px; }
+
+  @media (max-width: 768px) { .sidebar { display: none; } .content { padding: 16px; } .topbar { padding: 14px 16px; } }
+
+  /* LOGIN OVERLAY */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(155deg, var(--navy) 0%, #1a3a2a 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .login-box {
+    background: white; border-radius: 20px; padding: 40px 36px;
+    width: 100%; max-width: 400px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .login-icon { font-size: 44px; margin-bottom: 16px; }
+  .login-title { font-family: 'Lora', serif; font-size: 1.5rem; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .login-sub { font-size: 0.88rem; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+  .login-input {
+    width: 100%; padding: 14px 16px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 1rem;
+    color: var(--navy); outline: none; margin-bottom: 14px;
+    transition: border-color 0.15s; text-align: center; letter-spacing: 0.1em;
+  }
+  .login-input:focus { border-color: var(--brand); }
+  .login-btn {
+    width: 100%; padding: 14px; background: var(--brand); color: white;
+    border: none; border-radius: 10px; font-family: 'Outfit', sans-serif;
+    font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+  }
+  .login-btn:hover { background: var(--brand-dark); }
+  .login-error { color: #EF4444; font-size: 0.85rem; margin-top: 10px; min-height: 20px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-icon">📊</div>
+    <div class="login-title">Dashboard Access</div>
+    <div class="login-sub">Enter the admin password to view survey results.</div>
+    <input class="login-input" type="password" id="loginInput" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">View Results →</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="layout" id="mainLayout" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-mark">🌍</div>
+      <div><div class="sidebar-title">Youth Survey</div><div class="sidebar-sub">Results Dashboard</div></div>
+    </div>
+    <div class="sidebar-section">Analytics</div>
+    <div class="sidebar-link active" onclick="showTab('overview')">📊 Overview <span class="sidebar-count" id="totalBadge">0</span></div>
+    <div class="sidebar-link" onclick="showTab('awareness')">💡 Awareness</div>
+    <div class="sidebar-link" onclick="showTab('motivation')">🔥 Motivation</div>
+    <div class="sidebar-link" onclick="showTab('actions')">🤝 Actions</div>
+    <div class="sidebar-link" onclick="showTab('quotes')">💬 Open Responses</div>
+    <div class="sidebar-link" onclick="showTab('contacts')">📧 Contacts</div>
+    <div class="sidebar-section">Data</div>
+    <div class="sidebar-link" onclick="showTab('raw')">🗃️ Raw Responses</div>
+    <div class="sidebar-link" onclick="exportCSV()">⬇️ Export CSV</div>
+    <div style="flex:1"></div>
+    <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:rgba(255,255,255,0.3);line-height:1.5;">
+      Internal use only<br>Youth Engagement Survey · 2025
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">Overview</div>
+      <div class="topbar-actions">
+        <button class="btn-sm btn-outline" onclick="loadData()">↻ Refresh</button>
+        <button class="btn-sm btn-green" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+
+    <div id="loadingState" class="content">
+      <div class="loading-state"><div class="loading-spinner"></div><div>Loading responses…</div></div>
+    </div>
+
+    <div class="content tab-content" id="tab-overview" style="display:none">
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="chart-grid" id="overviewCharts"></div>
+    </div>
+    <div class="content tab-content" id="tab-awareness" style="display:none"><div class="chart-grid" id="awarenessCharts"></div></div>
+    <div class="content tab-content" id="tab-motivation" style="display:none"><div id="motivationContent"></div></div>
+    <div class="content tab-content" id="tab-actions" style="display:none"><div class="chart-grid" id="actionCharts"></div></div>
+    <div class="content tab-content" id="tab-quotes" style="display:none"><div id="quotesContent"></div></div>
+    <div class="content tab-content" id="tab-raw" style="display:none">
+      <div class="chart-card"><div class="chart-title">All Responses</div><div class="chart-sub">Individual anonymous submissions</div><div class="table-wrap" id="rawTable"></div></div>
+    </div>
+    <div class="content tab-content" id="tab-contacts" style="display:none">
+      <div class="chart-card"><div class="chart-title">Contact requests</div><div class="chart-sub">People who opted in to be contacted for further surveys or information</div><div class="table-wrap" id="contactsTable"></div></div>
+    </div>
+  </main>
+</div><!-- /#mainLayout -->
+
+<script>
+let allResponses = [];
+let charts = {};
+let currentTab = 'overview';
+let adminKey = sessionStorage.getItem('survey_admin_key') || '';
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (adminKey) { showDashboard(); loadData(); }
+});
+
+function doLogin() {
+  const val = document.getElementById('loginInput').value.trim();
+  if (!val) return;
+  adminKey = val;
+  document.getElementById('loginError').textContent = '';
+  loadData();
+}
+
+function showDashboard() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('mainLayout').style.display = 'flex';
+}
+
+const LABELS = {
+  q3: { map: { moved:'Moved to help', guilty:'Guilty but unsure', overwhelmed:'Overwhelmed', disconnected:'Disconnected', hope:'Hopeful' } },
+  q5: { map: { time:'Not enough time', money:'No money', hopeless:'Feels hopeless', dont_know:"Don't know how", peers:'Peers not involved', nothing:'No barrier' } },
+  q8: { map: { short_video:'Short videos', app:'App/challenge', event:'Live event/camp', group:'Small group', social_campaign:'Social campaign', story_series:'Story series' } },
+  q9: { map: { none:"Can't right now", '1hr':'Up to 1 hour', '2-3hr':'2–3 hours', 'half-day':'Half day+', already:'Already involved' } },
+  q10: { map: { yes_def:'Yes, definitely', yes_maybe:'Maybe', participate:'Participate only', no:'No' } },
+  q11: { map: { under13:'Under 13', '13-15':'13–15', '16-18':'16–18', '19-24':'19–24', '25plus':'25+' } },
+  q12: { map: { regular:'Regular', occasional:'Occasional', faith_no_church:'Faith, no church', no:'No' } },
+  q14: { map: { yes_active:'Actively involved', yes_past:'Previously involved', aware:'Aware only', neither:'New to this' } },
+};
+
+const Q4_LABELS = { impact:'Seeing impact', friends:'Friends doing it', clarity:'Clear path to start', faith:'Faith/values', easy:'Low time/money', leader:'Leadership role' };
+const COLORS = ['#00A651','#007A3D','#4DC489','#1A1F3A','#F59E0B','#EF4444','#6EE7B7','#2C3358'];
+
+async function loadData() {
+  document.getElementById('loadingState').style.display = 'block';
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  try {
+    const res = await fetch('/.netlify/functions/get-responses', {
+      headers: { 'x-admin-key': adminKey }
+    });
+    if (res.status === 401) {
+      adminKey = ''; sessionStorage.removeItem('survey_admin_key');
+      document.getElementById('loginError').textContent = 'Incorrect password — try again.';
+      document.getElementById('loadingState').style.display = 'none';
+      return;
+    }
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    allResponses = await res.json();
+    sessionStorage.setItem('survey_admin_key', adminKey);
+    showDashboard();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('loginError').textContent = 'Connection error. Check your network.';
+    document.getElementById('loadingState').style.display = 'none';
+    return;
+  }
+  document.getElementById('totalBadge').textContent = allResponses.length;
+  document.getElementById('loadingState').style.display = 'none';
+  if (!allResponses.length) { showEmpty(); return; }
+  buildAll();
+  showTab(currentTab);
+}
+
+function showEmpty() {
+  document.getElementById('tab-overview').style.display = 'block';
+  document.getElementById('tab-overview').innerHTML = `<div class="empty-state"><div class="em-icon">📭</div><h3>No responses yet</h3><p>Share the survey link. Responses appear here once submitted.</p></div>`;
+}
+
+function buildAll() { buildOverview(); buildAwareness(); buildMotivation(); buildActions(); buildQuotes(); buildContacts(); buildRaw(); }
+
+function count(arr, key) {
+  const c = {};
+  arr.forEach(r => { const v = r[key]; if (!v) return; if (Array.isArray(v)) v.forEach(x => c[x]=(c[x]||0)+1); else c[v]=(c[v]||0)+1; });
+  return c;
+}
+
+function avg(arr, key) {
+  const vals = arr.map(r => r[key]).filter(v => v != null);
+  return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : '—';
+}
+
+function makeBar(id, labels, data, color='#00A651') {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'bar', data:{ labels, datasets:[{ data, backgroundColor:color, borderRadius:6, borderSkipped:false }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{family:'Outfit',size:11}, color:'#6B7280', maxRotation:30 } }, y:{ grid:{ color:'#F0F5F2' }, ticks:{ font:{family:'Outfit',size:11}, color:'#6B7280', stepSize:1 } } } }
+  });
+}
+
+function makeDoughnut(id, labels, data) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {
+    type:'doughnut', data:{ labels, datasets:[{ data, backgroundColor:COLORS, borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'Outfit',size:11}, color:'#6B7280', padding:14, boxWidth:12, boxHeight:12 } } }, cutout:'60%' }
+  });
+}
+
+function buildOverview() {
+  const n = allResponses.length;
+  const leaderPct = n ? Math.round(allResponses.filter(r => r.q10==='yes_def'||r.q10==='yes_maybe').length/n*100) : 0;
+  const engaged = allResponses.filter(r => r.q9==='already'||r.q9==='half-day'||r.q9==='2-3hr').length;
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total Responses</div><div class="stat-value">${n}</div><div class="stat-sub"><span class="stat-pill">📋 All submissions</span></div></div>
+    <div class="stat-card"><div class="stat-label">Leader Pipeline</div><div class="stat-value">${leaderPct}%</div><div class="stat-sub">Interested in shaping programs</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Self-Efficacy</div><div class="stat-value">${avg(allResponses,'q6')}<span style="font-size:1rem;color:var(--muted)">/5</span></div><div class="stat-sub">Belief actions can help</div></div>
+    <div class="stat-card"><div class="stat-label">Time-Available</div><div class="stat-value">${engaged}</div><div class="stat-sub">Give 2+ hrs/month</div></div>`;
+
+  const ageCounts = count(allResponses,'q11'); const rxCounts = count(allResponses,'q3'); const rxMap = LABELS.q3.map;
+  document.getElementById('overviewCharts').innerHTML = `
+    <div class="chart-card"><div class="chart-title">Respondents by age</div><div class="chart-sub">Who took the survey</div><div class="chart-wrap"><canvas id="c-age"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Emotional reaction to poverty</div><div class="chart-sub">Q3 — most honest response</div><div class="chart-wrap"><canvas id="c-reaction"></canvas></div></div>`;
+  setTimeout(() => {
+    const ageMap = LABELS.q11.map; const aL = Object.keys(ageMap).filter(k=>ageCounts[k]);
+    makeBar('c-age', aL.map(k=>ageMap[k]), aL.map(k=>ageCounts[k]||0));
+    const rxL = Object.keys(rxMap).filter(k=>rxCounts[k]);
+    makeDoughnut('c-reaction', rxL.map(k=>rxMap[k]), rxL.map(k=>rxCounts[k]||0));
+  }, 50);
+}
+
+function buildAwareness() {
+  const srcMap = { social_media:'Social media', school:'School', church:'Church/youth group', family:'Family', news:'News/podcasts', orgs:'Aid organisations', none:'None' };
+  const srcCounts = count(allResponses,'q2'); const knowCounts = {}; allResponses.forEach(r => { if(r.q1) knowCounts[r.q1]=(knowCounts[r.q1]||0)+1; });
+  const brandCounts = count(allResponses,'q14'); const brandMap = LABELS.q14.map;
+  document.getElementById('awarenessCharts').innerHTML = `
+    <div class="chart-card" style="grid-column:span 2"><div class="chart-title">Where young people learn about poverty</div><div class="chart-sub">Q2 — multi-select</div><div class="chart-wrap-tall"><canvas id="c-sources"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Self-rated knowledge</div><div class="chart-sub">Q1 — scale 1 (nothing) to 5 (a lot)</div><div class="chart-wrap"><canvas id="c-know"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Prior involvement with aid orgs</div><div class="chart-sub">Q14</div><div class="chart-wrap"><canvas id="c-brand"></canvas></div></div>`;
+  setTimeout(() => {
+    const sL = Object.keys(srcMap).filter(k=>srcCounts[k]);
+    makeBar('c-sources', sL.map(k=>srcMap[k]), sL.map(k=>srcCounts[k]||0));
+    makeBar('c-know', ['1','2','3','4','5'], [1,2,3,4,5].map(k=>knowCounts[k]||0), '#007A3D');
+    const bL = Object.keys(brandMap).filter(k=>brandCounts[k]);
+    makeDoughnut('c-brand', bL.map(k=>brandMap[k]), bL.map(k=>brandCounts[k]||0));
+  }, 50);
+}
+
+function buildMotivation() {
+  const scores = {}; Object.keys(Q4_LABELS).forEach(k=>scores[k]=0);
+  allResponses.forEach(r => { if(!r.q4_rank) return; r.q4_rank.forEach((item,idx) => { scores[item]=(scores[item]||0)+(6-idx); }); });
+  const maxScore = allResponses.length*6; const sorted = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const barrierCounts = count(allResponses,'q5'); const barrierMap = LABELS.q5.map;
+  const churchCounts = count(allResponses,'q12'); const churchMap = LABELS.q12.map;
+  const effCounts = {}; allResponses.forEach(r => { if(r.q6) effCounts[r.q6]=(effCounts[r.q6]||0)+1; });
+
+  document.getElementById('motivationContent').innerHTML = `
+    <div class="chart-grid">
+      <div class="chart-card"><div class="chart-title">What motivates action most</div><div class="chart-sub">Q4 — weighted rank score</div><div class="rank-table" id="rankViz"></div></div>
+      <div class="chart-card"><div class="chart-title">Biggest barrier to getting involved</div><div class="chart-sub">Q5</div><div class="chart-wrap"><canvas id="c-barrier"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Church / community connection</div><div class="chart-sub">Q12</div><div class="chart-wrap"><canvas id="c-church"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title">Self-efficacy distribution</div><div class="chart-sub">Q6 — belief that actions matter</div><div class="chart-wrap"><canvas id="c-efficacy"></canvas></div></div>
+    </div>`;
+
+  document.getElementById('rankViz').innerHTML = sorted.map(([key,score],i) => `
+    <div class="rank-row"><div class="rank-pos">${i+1}</div><div class="rank-bar-wrap"><div class="rank-bar-label">${Q4_LABELS[key]}</div><div class="rank-bar-track"><div class="rank-bar-fill" style="width:${maxScore?Math.round(score/maxScore*100):0}%"></div></div></div><div class="rank-score">${score||0}</div></div>`).join('');
+
+  setTimeout(() => {
+    const bL = Object.keys(barrierMap).filter(k=>barrierCounts[k]);
+    makeBar('c-barrier', bL.map(k=>barrierMap[k]), bL.map(k=>barrierCounts[k]||0), '#F59E0B');
+    const cL = Object.keys(churchMap).filter(k=>churchCounts[k]);
+    makeDoughnut('c-church', cL.map(k=>churchMap[k]), cL.map(k=>churchCounts[k]||0));
+    makeBar('c-efficacy', ['1','2','3','4','5'], [1,2,3,4,5].map(k=>effCounts[k]||0));
+  }, 50);
+}
+
+function buildActions() {
+  const actionMap = { sponsor:'Sponsoring a child', fundraise:'Fundraising', social:'Social media', pray:'Prayer', advocate:'Advocacy', volunteer:'Volunteering', trip:'Mission trip', educate:'Teaching others' };
+  const actionCounts = count(allResponses,'q7'); const fmtCounts = count(allResponses,'q8'); const fmtMap = LABELS.q8.map;
+  const timeCounts = count(allResponses,'q9'); const timeMap = LABELS.q9.map;
+  const leadCounts = count(allResponses,'q10'); const leadMap = LABELS.q10.map;
+
+  document.getElementById('actionCharts').innerHTML = `
+    <div class="chart-card" style="grid-column:span 2"><div class="chart-title">Actions young people would consider</div><div class="chart-sub">Q7 — multi-select</div><div class="chart-wrap-tall"><canvas id="c-actions"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Preferred format</div><div class="chart-sub">Q8</div><div class="chart-wrap"><canvas id="c-format"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Time available per month</div><div class="chart-sub">Q9</div><div class="chart-wrap"><canvas id="c-time"></canvas></div></div>
+    <div class="chart-card" style="grid-column:span 2"><div class="chart-title">Interest in leadership / shaping programs</div><div class="chart-sub">Q10 — identifies youth advisory pipeline</div><div class="chart-wrap"><canvas id="c-lead"></canvas></div></div>`;
+  setTimeout(() => {
+    const aL = Object.keys(actionMap).filter(k=>actionCounts[k]);
+    makeBar('c-actions', aL.map(k=>actionMap[k]), aL.map(k=>actionCounts[k]||0));
+    const fL = Object.keys(fmtMap).filter(k=>fmtCounts[k]);
+    makeDoughnut('c-format', fL.map(k=>fmtMap[k]), fL.map(k=>fmtCounts[k]||0));
+    const tL = Object.keys(timeMap).filter(k=>timeCounts[k]);
+    makeBar('c-time', tL.map(k=>timeMap[k]), tL.map(k=>timeCounts[k]||0), '#1A1F3A');
+    const lL = Object.keys(leadMap).filter(k=>leadCounts[k]);
+    makeBar('c-lead', lL.map(k=>leadMap[k]), lL.map(k=>leadCounts[k]||0), '#4DC489');
+  }, 50);
+}
+
+function buildQuotes() {
+  const quotes = allResponses.filter(r=>r.q15&&r.q15.length>5); const ageMap = LABELS.q11.map;
+  document.getElementById('quotesContent').innerHTML = quotes.length===0
+    ? `<div class="empty-state"><div class="em-icon">💬</div><h3>No open responses yet</h3><p>Q15 answers will appear here once submitted.</p></div>`
+    : `<div class="chart-card"><div class="chart-title">Open Responses — Q15</div><div class="chart-sub">"What could aid organisations do to get more young people involved?" (${quotes.length} responses)</div><div class="quotes-list" style="margin-top:16px;">${
+        quotes.map(r=>`<div class="quote-card"><div class="quote-text">"${r.q15}"</div><div class="quote-meta">Age: ${ageMap[r.q11]||'—'} · Church: ${r.q12||'—'}</div></div>`).join('')
+      }</div></div>`;
+}
+
+function buildContacts() {
+  const opted = allResponses.filter(r => r.q16_wants_contact === 'yes' && (r.q16_name || r.q16_email));
+  const ageMap = LABELS.q11.map;
+  if (!opted.length) {
+    document.getElementById('contactsTable').innerHTML = '<p style="color:var(--muted);padding:20px">No contact opt-ins yet.</p>';
+    return;
+  }
+  document.getElementById('contactsTable').innerHTML = `<table><thead><tr><th>#</th><th>Name</th><th>Year of birth</th><th>Email</th><th>Age group</th><th>Church</th></tr></thead><tbody>${
+    opted.map((r,i) => `<tr><td>${i+1}</td><td style="font-weight:600">${r.q16_name||'—'}</td><td>${r.q16_year||'—'}</td><td style="color:var(--brand-dark)">${r.q16_email||'—'}</td><td>${ageMap[r.q11]||'—'}</td><td>${r.q12||'—'}</td></tr>`)
+    .join('')
+  }</tbody></table>`;
+}
+
+function buildRaw() {
+  if (!allResponses.length) { document.getElementById('rawTable').innerHTML='<p style="color:var(--muted);padding:20px">No responses yet.</p>'; return; }
+  const rxMap = LABELS.q3.map; const bMap = LABELS.q5.map;
+  document.getElementById('rawTable').innerHTML = `<table><thead><tr><th>#</th><th>Age</th><th>Church</th><th>Reaction</th><th>Barrier</th><th>Would do</th><th>Q15 Open</th><th>Contact?</th></tr></thead><tbody>${
+    allResponses.map((r,i)=>`<tr><td>${i+1}</td><td>${LABELS.q11.map[r.q11]||'—'}</td><td>${r.q12||'—'}</td><td>${rxMap[r.q3]||'—'}</td><td>${bMap[r.q5]||'—'}</td><td>${(r.q7||[]).map(a=>`<span class="tag">${a}</span>`).join('')||'—'}</td><td style="max-width:180px;font-style:italic;color:var(--muted)">${r.q15||'—'}</td><td>${r.q16_wants_contact==='yes'?'<span class="tag" style="background:#dcfce7;color:#166534">Yes</span>':'—'}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
+  document.querySelectorAll('.sidebar-link').forEach(l=>l.classList.remove('active'));
+  const el = document.getElementById(`tab-${tab}`); if(el) el.style.display='block';
+  const titles = { overview:'Overview', awareness:'Awareness & Knowledge', motivation:'Motivation & Barriers', actions:'Actions & Formats', quotes:'Open Responses', contacts:'Contact Requests', raw:'Raw Responses' };
+  document.getElementById('pageTitle').textContent = titles[tab]||'Dashboard';
+}
+
+function exportCSV() {
+  if (!allResponses.length) { alert('No responses to export.'); return; }
+  const headers = ['id','timestamp','q1_knowledge','q2_sources','q3_reaction','q4_rank','q5_barrier','q6_efficacy','q7_actions','q8_format','q9_time','q10_leadership','q11_age','q12_church','q13_church_focus','q14_prior_involvement','q15_open','q16_wants_contact','q16_name','q16_email'];
+  const rows = allResponses.map(r=>[r.id,r.timestamp,r.q1||'',(r.q2||[]).join('|'),r.q3||'',(r.q4_rank||[]).join('>'),r.q5||'',r.q6||'',(r.q7||[]).join('|'),r.q8||'',r.q9||'',r.q10||'',r.q11||'',r.q12||'',r.q13||'',r.q14||'',(r.q15||'').replace(/,/g,' '),r.q16_wants_contact||'',(r.q16_name||'').replace(/,/g,' '),(r.q16_email||'').replace(/,/g,' ')].map(v=>`"${v}"`).join(','));
+  const csv = [headers.join(','),...rows].join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=`youth_survey_responses_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+}
+
+// Init handled by DOMContentLoaded listener above.
+</script>
+</body>
+</html>
