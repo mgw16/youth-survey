@@ -291,11 +291,12 @@ function buildOverview() {
   const n = allResponses.length;
   const leaderPct = n ? Math.round(allResponses.filter(r => r.q10==='yes_def'||r.q10==='yes_maybe').length/n*100) : 0;
   const engaged = allResponses.filter(r => r.q9==='already'||r.q9==='half-day'||r.q9==='2-3hr').length;
+  const referrals = allResponses.reduce((acc, r) => acc + (r.q17_friend_emails ? r.q17_friend_emails.length : 0), 0);
   document.getElementById('statGrid').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Responses</div><div class="stat-value">${n}</div><div class="stat-sub"><span class="stat-pill">📋 All submissions</span></div></div>
     <div class="stat-card"><div class="stat-label">Leader Pipeline</div><div class="stat-value">${leaderPct}%</div><div class="stat-sub">Interested in shaping programs</div></div>
     <div class="stat-card"><div class="stat-label">Avg Self-Efficacy</div><div class="stat-value">${avg(allResponses,'q6')}<span style="font-size:1rem;color:var(--muted)">/5</span></div><div class="stat-sub">Belief actions can help</div></div>
-    <div class="stat-card"><div class="stat-label">Time-Available</div><div class="stat-value">${engaged}</div><div class="stat-sub">Give 2+ hrs/month</div></div>`;
+    <div class="stat-card"><div class="stat-label">Friend Referrals</div><div class="stat-value">${referrals}</div><div class="stat-sub">Emails shared by respondents</div></div>`;
 
   const ageCounts = count(allResponses,'q11'); const rxCounts = count(allResponses,'q3'); const rxMap = LABELS.q3.map;
   document.getElementById('overviewCharts').innerHTML = `
@@ -378,34 +379,89 @@ function buildActions() {
 }
 
 function buildQuotes() {
-  const quotes = allResponses.filter(r=>r.q15&&r.q15.length>5); const ageMap = LABELS.q11.map;
-  document.getElementById('quotesContent').innerHTML = quotes.length===0
-    ? `<div class="empty-state"><div class="em-icon">💬</div><h3>No open responses yet</h3><p>Q15 answers will appear here once submitted.</p></div>`
-    : `<div class="chart-card"><div class="chart-title">Open Responses — Q15</div><div class="chart-sub">"What could aid organisations do to get more young people involved?" (${quotes.length} responses)</div><div class="quotes-list" style="margin-top:16px;">${
-        quotes.map(r=>`<div class="quote-card"><div class="quote-text">"${r.q15}"</div><div class="quote-meta">Age: ${ageMap[r.q11]||'—'} · Church: ${r.q12||'—'}</div></div>`).join('')
-      }</div></div>`;
+  const ageMap = LABELS.q11.map;
+  const q15s = allResponses.filter(r=>r.q15&&r.q15.length>5);
+  const stories = allResponses.filter(r=>r.q18_story&&r.q18_story.length>5);
+  const q15Html = q15s.length===0
+    ? '<p style="color:var(--muted);padding:12px 0">No responses yet.</p>'
+    : q15s.map(r=>`<div class="quote-card"><div class="quote-text">"${r.q15}"</div><div class="quote-meta">Age: ${ageMap[r.q11]||'—'} · Church: ${r.q12_church_name||r.q12||'—'}</div></div>`).join('');
+  const storiesHtml = stories.length===0
+    ? '<p style="color:var(--muted);padding:12px 0">No stories yet.</p>'
+    : stories.map(r=>`<div class="quote-card" style="border-left-color:var(--amber)"><div class="quote-text">"${r.q18_story}"</div><div class="quote-meta">Age: ${ageMap[r.q11]||'—'} · Church: ${r.q12_church_name||r.q12||'—'}</div></div>`).join('');
+  document.getElementById('quotesContent').innerHTML = `
+    <div class="chart-card"><div class="chart-title">Q15 — What could organisations do?</div><div class="chart-sub">${q15s.length} responses</div><div class="quotes-list" style="margin-top:16px">${q15Html}</div></div>
+    <div class="chart-card" style="margin-top:18px"><div class="chart-title">Stories of hope</div><div class="chart-sub">${stories.length} responses</div><div class="quotes-list" style="margin-top:16px">${storiesHtml}</div></div>`;
 }
 
 function buildContacts() {
   const opted = allResponses.filter(r => r.q16_wants_contact === 'yes' && (r.q16_name || r.q16_email));
   const ageMap = LABELS.q11.map;
-  if (!opted.length) {
-    document.getElementById('contactsTable').innerHTML = '<p style="color:var(--muted);padding:20px">No contact opt-ins yet.</p>';
-    return;
-  }
-  document.getElementById('contactsTable').innerHTML = `<table><thead><tr><th>#</th><th>Name</th><th>Year of birth</th><th>Email</th><th>Age group</th><th>Church</th></tr></thead><tbody>${
-    opted.map((r,i) => `<tr><td>${i+1}</td><td style="font-weight:600">${r.q16_name||'—'}</td><td>${r.q16_year||'—'}</td><td style="color:var(--brand-dark)">${r.q16_email||'—'}</td><td>${ageMap[r.q11]||'—'}</td><td>${r.q12||'—'}</td></tr>`)
-    .join('')
-  }</tbody></table>`;
+
+  // Collect all referred friend emails
+  const referred = [];
+  allResponses.forEach(r => {
+    if (r.q17_friend_emails && r.q17_friend_emails.length) {
+      r.q17_friend_emails.forEach(email => referred.push(email));
+    }
+  });
+
+  const optedHtml = opted.length === 0
+    ? '<p style="color:var(--muted);padding:12px 0">No contact opt-ins yet.</p>'
+    : `<table><thead><tr><th>#</th><th>Name</th><th>Year of birth</th><th>Email</th><th>Age group</th><th>Church</th></tr></thead><tbody>${
+        opted.map((r,i) => `<tr><td>${i+1}</td><td style="font-weight:600">${r.q16_name||'—'}</td><td>${r.q16_year||'—'}</td><td style="color:var(--brand-dark)">${r.q16_email||'—'}</td><td>${ageMap[r.q11]||'—'}</td><td>${r.q12||'—'}</td></tr>`)
+        .join('')
+      }</tbody></table>`;
+
+  const referredHtml = referred.length === 0
+    ? '<p style="color:var(--muted);padding:12px 0">No friend emails submitted yet.</p>'
+    : `<table><thead><tr><th>#</th><th>Referred email address</th></tr></thead><tbody>${
+        referred.map((e,i) => `<tr><td>${i+1}</td><td style="color:var(--brand-dark)">${e}</td></tr>`).join('')
+      }</tbody></table>`;
+
+  document.getElementById('contactsTable').innerHTML = `
+    <div class="chart-title" style="margin-bottom:4px">Opted-in contacts</div>
+    <div class="chart-sub" style="margin-bottom:14px">Respondents who asked to be contacted directly</div>
+    ${optedHtml}
+    <div class="chart-title" style="margin:24px 0 4px">Friend referral emails</div>
+    <div class="chart-sub" style="margin-bottom:14px">Emails of friends shared by respondents (${referred.length} total)</div>
+    ${referredHtml}`;
 }
 
 function buildRaw() {
   if (!allResponses.length) { document.getElementById('rawTable').innerHTML='<p style="color:var(--muted);padding:20px">No responses yet.</p>'; return; }
   const rxMap = LABELS.q3.map; const bMap = LABELS.q5.map;
-  document.getElementById('rawTable').innerHTML = `<table><thead><tr><th>#</th><th>Age</th><th>Church</th><th>Reaction</th><th>Barrier</th><th>Would do</th><th>Q15 Open</th><th>Contact?</th></tr></thead><tbody>${
-    allResponses.map((r,i)=>`<tr><td>${i+1}</td><td>${LABELS.q11.map[r.q11]||'—'}</td><td>${r.q12||'—'}</td><td>${rxMap[r.q3]||'—'}</td><td>${bMap[r.q5]||'—'}</td><td>${(r.q7||[]).map(a=>`<span class="tag">${a}</span>`).join('')||'—'}</td><td style="max-width:180px;font-style:italic;color:var(--muted)">${r.q15||'—'}</td><td>${r.q16_wants_contact==='yes'?'<span class="tag" style="background:#dcfce7;color:#166534">Yes</span>':'—'}</td></tr>`).join('')
+  document.getElementById('rawTable').innerHTML = `<table><thead><tr><th>#</th><th>Age</th><th>Church</th><th>Church name</th><th>Reaction</th><th>Barrier</th><th>Contact?</th><th></th></tr></thead><tbody>${
+    allResponses.map((r,i)=>`<tr>
+      <td>${i+1}</td>
+      <td>${LABELS.q11.map[r.q11]||'—'}</td>
+      <td>${r.q12||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${r.q12_church_name||'—'}</td>
+      <td>${rxMap[r.q3]||'—'}</td>
+      <td>${bMap[r.q5]||'—'}</td>
+      <td>${r.q16_wants_contact==='yes'?'<span class="tag" style="background:#dcfce7;color:#166534">Yes</span>':'—'}</td>
+      <td><button onclick="deleteEntry('${r.id}')" style="background:transparent;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:sans-serif;font-weight:600;">Delete</button></td>
+    </tr>`).join('')
   }</tbody></table>`;
 }
+
+async function deleteEntry(id) {
+  if (!confirm('Delete this response? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/.netlify/functions/delete-response', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw new Error('Delete failed');
+    allResponses = allResponses.filter(r => r.id !== id);
+    document.getElementById('totalBadge').textContent = allResponses.length;
+    buildAll();
+    showTab('raw');
+  } catch(err) {
+    alert('Could not delete — check your connection and try again.');
+  }
+}
+
 
 function showTab(tab) {
   currentTab = tab;
