@@ -435,10 +435,13 @@
       <div class="q-num-badge">Question 12 of 15</div>
       <div class="q-text">Are you connected to a church or Christian community?</div>
       <div class="choices" id="q12">
-        <label class="choice"><input type="radio" name="q12" value="regular"><span class="choice-text">Yes — I go regularly</span></label>
-        <label class="choice"><input type="radio" name="q12" value="occasional"><span class="choice-text">Yes — but not very often</span></label>
-        <label class="choice"><input type="radio" name="q12" value="faith_no_church"><span class="choice-text">No — but I have faith</span></label>
-        <label class="choice"><input type="radio" name="q12" value="no"><span class="choice-text">No</span></label>
+        <label class="choice"><input type="radio" name="q12" value="regular" onchange="toggleChurchName(this)"><span class="choice-text">Yes — I go regularly</span></label>
+        <label class="choice"><input type="radio" name="q12" value="occasional" onchange="toggleChurchName(this)"><span class="choice-text">Yes — but not very often</span></label>
+        <label class="choice"><input type="radio" name="q12" value="faith_no_church" onchange="toggleChurchName(this)"><span class="choice-text">No — but I have faith</span></label>
+        <label class="choice"><input type="radio" name="q12" value="no" onchange="toggleChurchName(this)"><span class="choice-text">No</span></label>
+      </div>
+      <div id="church-name-field" style="display:none;margin-top:14px;">
+        <input class="q-textarea" type="text" id="q12-church-name" placeholder="What's the name of your church?" style="min-height:unset;padding:13px 15px;">
       </div>
     </div>
 
@@ -471,6 +474,13 @@
       <textarea class="q-textarea" id="q15" placeholder="Write your answer here…"></textarea>
     </div>
 
+    <div class="q-card">
+      <div class="q-num-badge">Bonus question</div>
+      <div class="q-text">Tell us a story that gave you hope — about a person, community, or organisation that made a real difference for someone living in poverty or injustice. Big or small, near or far, something you saw, heard, read, or experienced.</div>
+      <div class="q-hint">There's no right answer — we just want to hear what's stayed with you.</div>
+      <textarea class="q-textarea" id="q18-story" placeholder="Write your story here…"></textarea>
+    </div>
+
     <div class="q-card" style="border-color:var(--brand);background:var(--brand-light);">
       <div class="q-num-badge" style="color:var(--brand-dark);">Optional</div>
       <div class="q-text">Would you like more information, or to be part of future surveys helping young people engage with ending global poverty?</div>
@@ -484,6 +494,25 @@
         <select class="q-textarea" id="q16-year" style="min-height:unset;padding:13px 15px;"><option value="">Year of birth</option></select>
         <input class="q-textarea" type="email" id="q16-email" placeholder="Your email address" style="min-height:unset;padding:13px 15px;">
       </div>
+    </div>
+
+    <div class="q-card" style="border-color:var(--brand);background:var(--brand-light);">
+      <div class="q-num-badge" style="color:var(--brand-dark);">Spread the word</div>
+      <div class="q-text" style="font-size:1rem;line-height:1.6;">If you have a friend who you think would help us by filling out this survey (age 8–18) please share this link — or share their email so we can reach them. Together we can win ground against poverty and injustice and make a real difference for the most vulnerable people on the planet! 🌍</div>
+
+      <div style="margin:16px 0 10px;">
+        <div style="font-size:11px;font-weight:700;color:var(--brand-dark);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Survey link to share</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="q-textarea" type="text" id="share-url" readonly style="min-height:unset;padding:11px 14px;font-size:0.85rem;background:white;flex:1;cursor:text;">
+          <button onclick="copyUrl()" id="copy-btn" style="padding:11px 16px;background:var(--brand);color:white;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s;">Copy link</button>
+        </div>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;color:var(--brand-dark);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Or enter a friend's email</div>
+      <div id="friend-emails" style="display:flex;flex-direction:column;gap:8px;">
+        <input class="q-textarea" type="email" placeholder="Friend's email address" style="min-height:unset;padding:13px 15px;">
+      </div>
+      <button onclick="addFriendEmail()" style="margin-top:10px;background:transparent;border:1.5px solid var(--brand);color:var(--brand-dark);border-radius:100px;padding:8px 18px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ Add another friend</button>
     </div>
   </div>
   <div class="nav-row">
@@ -600,12 +629,20 @@ function collectAnswers() {
   ['q3','q5','q8','q9','q10','q11','q12','q13','q14'].forEach(q => { const sel = document.querySelector(`input[name="${q}"]:checked`); result[q] = sel ? sel.value : null; });
   result['q4_rank'] = [...document.querySelectorAll('#rank-q4 .rank-item')].map(it => it.dataset.id);
   result['q15'] = document.getElementById('q15').value.trim();
+  result['q12_church_name'] = document.getElementById('q12-church-name').value.trim();
+  result['q18_story'] = document.getElementById('q18-story').value.trim();
   const contactYes = document.querySelector('input[name="q16"][value="yes"]:checked');
   result['q16_wants_contact'] = contactYes ? 'yes' : (document.querySelector('input[name="q16"]:checked') ? 'no' : null);
   result['q16_name']  = contactYes ? document.getElementById('q16-name').value.trim() : '';
   result['q16_year']  = contactYes ? document.getElementById('q16-year').value : '';
   result['q16_email'] = contactYes ? document.getElementById('q16-email').value.trim() : '';
+  result['q17_friend_emails'] = [...document.querySelectorAll('#friend-emails input')].map(i => i.value.trim()).filter(v => v);
   return result;
+}
+
+function toggleChurchName(radio) {
+  document.getElementById('church-name-field').style.display =
+    (radio.value === 'regular' || radio.value === 'occasional') ? 'block' : 'none';
 }
 
 function toggleContact(show) {
@@ -614,6 +651,33 @@ function toggleContact(show) {
   fields.style.flexDirection = 'column';
   fields.style.gap = '10px';
 }
+
+function copyUrl() {
+  const url = document.getElementById('share-url').value;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied! ✓';
+    btn.style.background = 'var(--brand-dark)';
+    setTimeout(() => { btn.textContent = 'Copy link'; btn.style.background = 'var(--brand)'; }, 2500);
+  }).catch(() => {
+    document.getElementById('share-url').select();
+    document.execCommand('copy');
+  });
+}
+
+function addFriendEmail() {
+  const container = document.getElementById('friend-emails');
+  if (container.children.length >= 5) return;
+  const inp = document.createElement('input');
+  inp.className = 'q-textarea';
+  inp.type = 'email';
+  inp.placeholder = "Friend's email address";
+  inp.style.cssText = 'min-height:unset;padding:13px 15px;';
+  container.appendChild(inp);
+}
+
+// Set share URL dynamically
+document.getElementById('share-url').value = window.location.origin + '/survey.html';
 
 // Populate year of birth dropdown
 (function() {
