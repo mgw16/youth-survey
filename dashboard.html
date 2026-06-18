@@ -6,6 +6,7 @@
 <title>Youth Survey — Results Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --brand: #00A651; --brand-dark: #007A3D; --brand-light: #E8F7F0; --brand-mid: #4DC489;
@@ -88,6 +89,7 @@
   .empty-state h3 { font-family: 'Lora', serif; font-size: 1.2rem; color: var(--navy); margin-bottom: 8px; }
 
   @media (max-width: 768px) { .sidebar { display: none; } .content { padding: 16px; } .topbar { padding: 14px 16px; } }
+  .demo-banner { background: var(--amber); color: var(--navy); font-size: 12px; font-weight: 700; text-align: center; padding: 6px; letter-spacing: 0.05em; }
 
   /* LOGIN OVERLAY */
   .login-overlay {
@@ -131,10 +133,15 @@
     <input class="login-input" type="password" id="loginInput" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" onclick="doLogin()">View Results →</button>
     <div class="login-error" id="loginError"></div>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);text-align:center;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Previewing before deployment?</div>
+      <button onclick="loadDemoData()" style="background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 18px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%;">Try with sample data →</button>
+    </div>
   </div>
 </div>
 
 <div class="layout" id="mainLayout" style="display:none">
+  <div class="demo-banner" id="demoBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:300;">⚠️ DEMO MODE — sample data only, not connected to live database</div>
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-mark">🌍</div>
@@ -147,8 +154,10 @@
     <div class="sidebar-link" onclick="showTab('actions')">🤝 Actions</div>
     <div class="sidebar-link" onclick="showTab('quotes')">💬 Open Responses</div>
     <div class="sidebar-link" onclick="showTab('contacts')">📧 Contacts</div>
+    <div class="sidebar-link" onclick="showTab('orgs')">🏢 Org Awareness</div>
     <div class="sidebar-section">Data</div>
     <div class="sidebar-link" onclick="showTab('raw')">🗃️ Raw Responses</div>
+    <div class="sidebar-link" onclick="exportPDF()">📄 Export PDF Report</div>
     <div class="sidebar-link" onclick="exportCSV()">⬇️ Export CSV</div>
     <div style="flex:1"></div>
     <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:rgba(255,255,255,0.3);line-height:1.5;">
@@ -161,6 +170,7 @@
       <div class="topbar-title" id="pageTitle">Overview</div>
       <div class="topbar-actions">
         <button class="btn-sm btn-outline" onclick="loadData()">↻ Refresh</button>
+        <button class="btn-sm btn-outline" id="exportPdfBtn" onclick="exportPDF()">Export PDF Report</button>
         <button class="btn-sm btn-green" onclick="exportCSV()">Export CSV</button>
       </div>
     </div>
@@ -183,6 +193,9 @@
     <div class="content tab-content" id="tab-contacts" style="display:none">
       <div class="chart-card"><div class="chart-title">Contact requests</div><div class="chart-sub">People who opted in to be contacted for further surveys or information</div><div class="table-wrap" id="contactsTable"></div></div>
     </div>
+    <div class="content tab-content" id="tab-orgs" style="display:none">
+      <div id="orgsContent"></div>
+    </div>
   </main>
 </div><!-- /#mainLayout -->
 
@@ -202,6 +215,64 @@ function doLogin() {
   adminKey = val;
   document.getElementById('loginError').textContent = '';
   loadData();
+}
+
+function loadDemoData() {
+  const ages = ['13-15','13-15','16-18','16-18','16-18','19-24','19-24','25plus','under13','16-18','13-15','19-24'];
+  const reactions = ['moved','hope','overwhelmed','guilty','moved','hope','moved','disconnected','overwhelmed','moved','hope','guilty'];
+  const barriers = ['dont_know','time','hopeless','peers','time','dont_know','nothing','money','hopeless','time','peers','dont_know'];
+  const formats = ['short_video','event','group','short_video','social_campaign','story_series','event','group','short_video','app','short_video','event'];
+  const churches = ['regular','regular','occasional','regular','faith_no_church','regular','no','regular','occasional','regular','regular','occasional'];
+  const churchNames = ['Highlands Church','Highlands Church','City Church','Grace Community','','Highlands Church','','Riverview Church','New Life Church','Highlands Church','Crossroads','City Church'];
+  const q15s = ['Make it feel like our actions actually do something — show real stories of impact','More social media content — short videos that explain the issues clearly','Connect it to things we already care about like music and sport','Let us lead our own fundraisers instead of just donating','Make it easier for under 18s to get involved without needing parents to do everything'];
+  const stories = ['I heard about a girl in Uganda who started a community garden to feed her village — she was only 14','A local church collected shoes for kids in PNG who couldn\'t go to school barefoot. Simple but changed lives','Destiny Rescue rescued a girl from trafficking and she now works with them to help others. So hopeful','Red Frogs helped a guy at Schoolies who had nowhere to sleep — small thing but it was everything to him','World Vision sponsor story — the kid I sponsored went to university. Blew my mind'];
+  const orgs = [
+    [{org:'compassion',name:'Compassion International',what:'Sponsors children in poverty',how:'Sponsor a child, fundraise at school'},{org:'tearfund',name:'Tearfund',what:'Christian aid organisation',how:'Events and campaigns'}],
+    [{org:'worldvision',name:'World Vision',what:'International development',how:'40 Hour Famine'},{org:'redfrogs',name:'Red Frogs Australia',what:'Help young people at parties and events',how:'Volunteer at events, schoolies'}],
+    [{org:'destiny',name:'Destiny Rescue',what:'Rescues kids from trafficking',how:'Fundraising, awareness campaigns'}],
+    [{org:'compassion',name:'Compassion International',what:'Child sponsorship in developing countries',how:'Sponsor a child for about $50/month'}],
+    [],
+    [{org:'tearfund',name:'Tearfund',what:'Disaster relief and development',how:'Youth campaigns and petitions'},{org:'convoy',name:'Convoy of Hope',what:'Feeding programs and disaster response',how:'Volunteering, food drives'}],
+    [{org:'redfrogs',name:'Red Frogs Australia',what:'Peer support at schoolies and festivals',how:'Train as a volunteer from age 16'}],
+    [{org:'worldvision',name:'World Vision',what:'Largest Christian aid org',how:'40 Hour Famine, Weet-Bix triathlon fundraising'}],
+    [],
+    [{org:'destiny',name:'Destiny Rescue',what:'Anti-trafficking organisation',how:'Fundraise through church, run events'}],
+    [{org:'beautiful_crazy',name:'Beautiful Crazy',what:'Not sure but I\'ve heard of them',how:'Not sure'}],
+    [{org:'samaritans',name:"Samaritan's Purse",what:'Operation Christmas Child',how:'Pack shoeboxes at Christmas'}],
+  ];
+  allResponses = ages.map((age, i) => ({
+    id: 'demo_' + i,
+    timestamp: new Date(Date.now() - i * 86400000).toISOString(),
+    q1: [2,3,4,3,2,4,5,4,2,3,3,4][i],
+    q2: [['social_media','church'],['school','family'],['church','orgs'],['social_media','news'],['family'],['church','orgs','social_media'],['news'],['church','family'],['social_media'],['church','orgs'],['school','social_media'],['orgs','news']][i],
+    q3: reactions[i],
+    q4_rank: ['impact','clarity','faith','friends','easy','leader'],
+    q5: barriers[i],
+    q6: [4,5,3,4,3,5,4,3,2,4,5,4][i],
+    q7: [['sponsor','pray'],['fundraise','social'],['pray','volunteer'],['educate','social'],['fundraise'],['sponsor','pray','educate'],['trip'],['volunteer','pray'],['social'],['fundraise','pray'],['educate'],['sponsor','advocate']][i],
+    q8: formats[i],
+    q9: ['1hr','2-3hr','none','1hr','2-3hr','half-day','already','2-3hr','1hr','2-3hr','1hr','half-day'][i],
+    q10: ['yes_maybe','yes_def','participate','yes_maybe','no','yes_def','yes_maybe','participate','yes_maybe','yes_def','yes_maybe','participate'][i],
+    q11: age,
+    q12: churches[i],
+    q12_church_name: churchNames[i],
+    q13: ['yes_lot','yes_lot','yes_some','yes_lot','na','yes_lot','na','yes_some','yes_some','yes_lot','yes_lot','yes_some'][i],
+    q14: ['aware','aware','yes_past','aware','neither','yes_active','neither','yes_past','neither','aware','aware','yes_active'][i],
+    q15: q15s[i % q15s.length],
+    q18_story: i < stories.length ? stories[i] : '',
+    q_orgs: orgs[i],
+    q16_wants_contact: ['yes','no','yes','no','no','yes','no','yes','no','yes','no','yes'][i],
+    q16_name: ['Sarah M','','James T','','','Priya K','','Tom W','','Emma L','','Grace P'][i],
+    q16_year: ['2008','','2007','','','2005','','2001','','2006','','2004'][i],
+    q16_email: ['sarah@email.com','','james@email.com','','','priya@email.com','','tom@email.com','','emma@email.com','','grace@email.com'][i],
+    q17_friend_emails: i % 3 === 0 ? ['friend'+i+'@email.com'] : [],
+  }));
+  document.getElementById('demoBanner').style.display = 'block';
+  document.getElementById('mainLayout').style.paddingTop = '30px';
+  document.getElementById('totalBadge').textContent = allResponses.length;
+  showDashboard();
+  buildAll();
+  showTab('overview');
 }
 
 function showDashboard() {
@@ -258,7 +329,7 @@ function showEmpty() {
   document.getElementById('tab-overview').innerHTML = `<div class="empty-state"><div class="em-icon">📭</div><h3>No responses yet</h3><p>Share the survey link. Responses appear here once submitted.</p></div>`;
 }
 
-function buildAll() { buildOverview(); buildAwareness(); buildMotivation(); buildActions(); buildQuotes(); buildContacts(); buildRaw(); }
+function buildAll() { buildOverview(); buildAwareness(); buildMotivation(); buildActions(); buildQuotes(); buildContacts(); buildOrgAwareness(); buildRaw(); }
 
 function count(arr, key) {
   const c = {};
@@ -468,7 +539,7 @@ function showTab(tab) {
   document.querySelectorAll('.tab-content').forEach(t=>t.style.display='none');
   document.querySelectorAll('.sidebar-link').forEach(l=>l.classList.remove('active'));
   const el = document.getElementById(`tab-${tab}`); if(el) el.style.display='block';
-  const titles = { overview:'Overview', awareness:'Awareness & Knowledge', motivation:'Motivation & Barriers', actions:'Actions & Formats', quotes:'Open Responses', contacts:'Contact Requests', raw:'Raw Responses' };
+  const titles = { overview:'Overview', awareness:'Awareness & Knowledge', motivation:'Motivation & Barriers', actions:'Actions & Formats', quotes:'Open Responses', contacts:'Contact Requests', orgs:'Organisation Awareness', raw:'Raw Responses' };
   document.getElementById('pageTitle').textContent = titles[tab]||'Dashboard';
 }
 
@@ -478,6 +549,216 @@ function exportCSV() {
   const rows = allResponses.map(r=>[r.id,r.timestamp,r.q1||'',(r.q2||[]).join('|'),r.q3||'',(r.q4_rank||[]).join('>'),r.q5||'',r.q6||'',(r.q7||[]).join('|'),r.q8||'',r.q9||'',r.q10||'',r.q11||'',r.q12||'',r.q13||'',r.q14||'',(r.q15||'').replace(/,/g,' '),r.q16_wants_contact||'',(r.q16_name||'').replace(/,/g,' '),(r.q16_email||'').replace(/,/g,' ')].map(v=>`"${v}"`).join(','));
   const csv = [headers.join(','),...rows].join('\n');
   const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=`youth_survey_responses_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+}
+
+
+function buildOrgAwareness() {
+  const responses = allResponses.filter(r => r.q_orgs && r.q_orgs.length > 0);
+  if (!responses.length) {
+    document.getElementById('orgsContent').innerHTML = '<div class="empty-state"><div class="em-icon">🏢</div><h3>No organisation responses yet</h3><p>Responses will appear here once young people complete the new survey version.</p></div>';
+    return;
+  }
+
+  // Count recognitions per org
+  const orgCounts = {};
+  const orgResponses = {};
+  responses.forEach(r => {
+    r.q_orgs.forEach(o => {
+      orgCounts[o.name] = (orgCounts[o.name] || 0) + 1;
+      if (!orgResponses[o.name]) orgResponses[o.name] = [];
+      if (o.what || o.how) orgResponses[o.name].push({ what: o.what, how: o.how });
+    });
+  });
+
+  const sorted = Object.entries(orgCounts).sort((a,b) => b[1]-a[1]);
+  const n = responses.length;
+
+  // Recognition bar chart
+  const barsHtml = sorted.map(([name, count]) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:0.5px solid var(--border);">
+      <div style="width:160px;font-size:13px;font-weight:500;color:var(--text);flex-shrink:0">${name}</div>
+      <div style="flex:1;height:8px;background:var(--brand-light);border-radius:4px;">
+        <div style="height:100%;background:var(--brand);border-radius:4px;width:${Math.round(count/n*100)}%"></div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--brand-dark);width:48px;text-align:right">${count} / ${n}</div>
+    </div>`).join('');
+
+  // Qualitative responses per org
+  const qualsHtml = sorted.map(([name]) => {
+    const rs = (orgResponses[name] || []).filter(r => r.what || r.how);
+    if (!rs.length) return '';
+    return `<div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-title">${name}</div>
+      <div class="chart-sub">${rs.length} response${rs.length!==1?'s':''} with detail</div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:12px;">
+        ${rs.slice(0,8).map(r => `
+          <div style="border-left:2px solid var(--brand);padding:10px 14px;background:var(--brand-light);border-radius:0 8px 8px 0;">
+            ${r.what ? `<div style="font-size:12px;font-weight:600;color:var(--brand-dark);margin-bottom:4px;">What they think it does:</div><div style="font-size:13px;color:var(--text);font-style:italic;margin-bottom:8px;">"${r.what}"</div>` : ''}
+            ${r.how ? `<div style="font-size:12px;font-weight:600;color:var(--brand-dark);margin-bottom:4px;">How under-18s could engage:</div><div style="font-size:13px;color:var(--text);font-style:italic;">"${r.how}"</div>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('orgsContent').innerHTML = `
+    <div class="chart-card" style="margin-bottom:18px">
+      <div class="chart-title">Organisation recognition</div>
+      <div class="chart-sub">How many respondents had heard of each organisation (${n} total responses with org data)</div>
+      <div style="margin-top:16px">${barsHtml}</div>
+    </div>
+    <div class="chart-title" style="margin:20px 0 14px;font-family:'Lora',serif;font-size:1.1rem;color:var(--navy)">What young people think &amp; how they'd engage</div>
+    ${qualsHtml}`;
+}
+
+async function exportPDF() {
+  if (!allResponses.length) { alert('No responses to export.'); return; }
+  const btn = document.getElementById('exportPdfBtn');
+  btn.textContent = 'Generating PDF...';
+  btn.disabled = true;
+
+  // Render all charts by briefly showing all sections off-screen
+  const tabs = document.querySelectorAll('.tab-content');
+  tabs.forEach(t => {
+    t.style.display = 'block';
+    t.style.opacity = '0';
+    t.style.position = 'fixed';
+    t.style.top = '-9999px';
+    t.style.left = '0';
+    t.style.width = '900px';
+    t.style.pointerEvents = 'none';
+  });
+  buildAll();
+  await new Promise(r => setTimeout(r, 1200));
+
+  // Capture chart images
+  const imgs = {};
+  Object.entries(charts).forEach(([id, chart]) => {
+    try { imgs[id] = chart.toBase64Image('image/png', 1.0); } catch(e) {}
+  });
+
+  // Restore
+  tabs.forEach(t => {
+    t.style.display = 'none';
+    t.style.opacity = '';
+    t.style.position = '';
+    t.style.top = '';
+    t.style.left = '';
+    t.style.width = '';
+    t.style.pointerEvents = '';
+  });
+  showTab(currentTab);
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, mg = 16;
+  let y = mg;
+
+  const addPage = () => { doc.addPage(); y = mg; };
+  const H1 = (txt, sz=14) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(sz); doc.setTextColor(26,31,58);
+    doc.text(txt, mg, y); y += sz*0.45 + 5;
+  };
+  const BODY = (txt, sz=9, color=[107,114,128]) => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(sz); doc.setTextColor(...color);
+    const lines = doc.splitTextToSize(txt, W - mg*2);
+    doc.text(lines, mg, y); y += lines.length*(sz*0.4+0.8) + 3;
+  };
+  const addChart = (id, title, h=65) => {
+    if (!imgs[id]) return;
+    if (y + h + 16 > 280) addPage();
+    H1(title, 11); y += 2;
+    doc.addImage(imgs[id], 'PNG', mg, y, W-mg*2, h);
+    y += h + 10;
+  };
+
+  // Cover
+  doc.setFillColor(26,31,58); doc.rect(0,0,W,65,'F');
+  doc.setFillColor(0,166,81); doc.rect(0,59,W,4,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  doc.text('Youth Engagement Survey', mg, 24);
+  doc.setFontSize(12); doc.setFont('helvetica','normal');
+  doc.text('Results Report', mg, 34);
+  doc.setFontSize(9); doc.setTextColor(200,230,200);
+  doc.text(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}), mg, 44);
+  doc.text(`${allResponses.length} total responses`, mg, 51);
+
+  y = 80;
+  H1('Key Statistics', 13);
+  const n = allResponses.length;
+  const leaderPct = n ? Math.round(allResponses.filter(r=>r.q10==='yes_def'||r.q10==='yes_maybe').length/n*100) : 0;
+  const avgEff = avg(allResponses,'q6');
+  const refs = allResponses.reduce((a,r)=>a+(r.q17_friend_emails?.length||0),0);
+  const statPairs = [['Total Responses',String(n)],['Leader Pipeline',leaderPct+'%'],['Avg Self-Efficacy',avgEff+'/5'],['Friend Referrals',String(refs)]];
+  let sx = mg;
+  statPairs.forEach(([label,val]) => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,114,128);
+    doc.text(label, sx, y);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(26,31,58);
+    doc.text(val, sx, y+8);
+    sx += 46;
+  });
+  y += 24;
+
+  // Section 1
+  addPage(); H1('Section 1 — Who Responded', 14); y += 3;
+  addChart('c-age','Age distribution',60);
+  addChart('c-reaction','Emotional reaction to poverty',68);
+
+  // Section 2
+  addPage(); H1('Section 2 — Awareness & Knowledge', 14); y += 3;
+  addChart('c-sources','Where young people learn about poverty',72);
+  addChart('c-know','Self-rated knowledge of global poverty',58);
+
+  // Section 3
+  addPage(); H1('Section 3 — Motivation & Barriers', 14); y += 3;
+  addChart('c-barrier','Biggest barrier to getting involved',60);
+  addChart('c-efficacy','Self-efficacy: belief that their actions matter',58);
+  addChart('c-church','Church / community connection',65);
+
+  // Section 4
+  addPage(); H1('Section 4 — Preferred Actions & Formats', 14); y += 3;
+  addChart('c-actions','Actions young people would consider',72);
+  addChart('c-format','Preferred format for engagement',66);
+
+  // Section 5
+  addPage(); H1('Section 5 — Leadership Interest', 14); y += 3;
+  addChart('c-lead','Interest in shaping programs',60);
+  addChart('c-time','Time available per month',58);
+
+  // Open responses
+  addPage(); H1('Open Responses — Q15', 14); y += 3;
+  BODY('"What could aid organisations do to get more young people involved?"', 9, [107,114,128]);
+  y += 2;
+  allResponses.filter(r=>r.q15&&r.q15.length>5).slice(0,12).forEach(r => {
+    if (y > 265) addPage();
+    BODY('"' + r.q15.substring(0,220) + (r.q15.length>220?'...':'"'), 9, [44,44,44]);
+  });
+
+  addPage(); H1('Stories of Hope', 14); y += 3;
+  allResponses.filter(r=>r.q18_story&&r.q18_story.length>5).slice(0,10).forEach(r => {
+    if (y > 265) addPage();
+    BODY('"' + r.q18_story.substring(0,220) + (r.q18_story.length>220?'...':'"'), 9, [44,44,44]);
+  });
+
+  // Org awareness
+  const orgResponders = allResponses.filter(r=>r.q_orgs&&r.q_orgs.length);
+  if (orgResponders.length) {
+    addPage(); H1('Organisation Awareness', 14); y += 3;
+    const orgCounts = {};
+    orgResponders.forEach(r => r.q_orgs.forEach(o => { orgCounts[o.name]=(orgCounts[o.name]||0)+1; }));
+    Object.entries(orgCounts).sort((a,b)=>b[1]-a[1]).forEach(([name,count]) => {
+      if (y > 270) addPage();
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,31,58);
+      doc.text(name, mg, y);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,114,128);
+      doc.text(`Recognised by ${count} of ${n} respondents`, mg+70, y);
+      y += 8;
+    });
+  }
+
+  doc.save('youth-survey-report-' + new Date().toISOString().slice(0,10) + '.pdf');
+  btn.textContent = 'Export PDF Report';
+  btn.disabled = false;
 }
 
 // Init handled by DOMContentLoaded listener above.
