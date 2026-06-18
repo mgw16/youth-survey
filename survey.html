@@ -467,6 +467,14 @@
       </div>
     </div>
 
+
+    <div class="q-card">
+      <div class="q-num-badge">Organisation Awareness</div>
+      <div class="q-text">Have you heard of any of the following organisations?</div>
+      <div class="q-hint">Tick any you recognise — then tell us what you think they do and how young people could get involved.</div>
+      <div id="org-list" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;"></div>
+    </div>
+
     <div class="q-card">
       <div class="q-num-badge">Question 15 of 15</div>
       <div class="q-text">What's one thing aid organisations could do to get more young people involved?</div>
@@ -620,6 +628,48 @@ function initDrag(listId) {
     }, {passive:false});
   });
 }
+
+const ORGS = [
+  { id: 'compassion',      name: 'Compassion International' },
+  { id: 'tearfund',        name: 'Tearfund' },
+  { id: 'worldvision',     name: 'World Vision' },
+  { id: 'cbm',             name: 'CBM Global (Christian Blind Mission)' },
+  { id: 'redfrogs',        name: 'Red Frogs Australia' },
+  { id: 'destiny',         name: 'Destiny Rescue' },
+  { id: 'convoy',          name: 'Convoy of Hope' },
+  { id: 'beautiful_crazy', name: 'Beautiful Crazy' },
+  { id: 'ijm',             name: 'International Justice Mission (IJM)' },
+  { id: 'samaritans',      name: "Samaritan's Purse" },
+];
+
+// Build org list dynamically
+(function() {
+  const list = document.getElementById('org-list');
+  if (!list) return;
+  ORGS.forEach(org => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'border:1.5px solid var(--border);border-radius:10px;overflow:hidden;';
+    wrap.innerHTML = `
+      <label class="choice" style="border:none;border-radius:0;margin:0;" id="org-label-${org.id}">
+        <input type="checkbox" id="org-cb-${org.id}" onchange="toggleOrg('${org.id}',this)">
+        <span class="choice-text" style="font-weight:500;">${org.name}</span>
+      </label>
+      <div id="org-detail-${org.id}" style="display:none;padding:16px;background:var(--brand-light);border-top:1px solid var(--border);">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--brand-dark);margin-bottom:8px;">What do you think ${org.name} does?</div>
+        <textarea class="q-textarea" id="org-${org.id}-what" placeholder="Share what you know..." style="min-height:70px;margin-bottom:12px;"></textarea>
+        <div style="font-size:0.85rem;font-weight:600;color:var(--brand-dark);margin-bottom:8px;">How could someone under 18 meaningfully engage with them?</div>
+        <textarea class="q-textarea" id="org-${org.id}-how" placeholder="Your thoughts..." style="min-height:70px;"></textarea>
+      </div>`;
+    list.appendChild(wrap);
+  });
+})();
+
+function toggleOrg(orgId, checkbox) {
+  document.getElementById('org-detail-' + orgId).style.display = checkbox.checked ? 'block' : 'none';
+  const label = document.getElementById('org-label-' + orgId);
+  if (label) label.classList.toggle('selected', checkbox.checked);
+}
+
 initDrag('rank-q4');
 
 function collectAnswers() {
@@ -637,6 +687,15 @@ function collectAnswers() {
   result['q16_year']  = contactYes ? document.getElementById('q16-year').value : '';
   result['q16_email'] = contactYes ? document.getElementById('q16-email').value.trim() : '';
   result['q17_friend_emails'] = [...document.querySelectorAll('#friend-emails input')].map(i => i.value.trim()).filter(v => v);
+  result['q_orgs'] = ORGS.filter(org => {
+    const cb = document.getElementById('org-cb-' + org.id);
+    return cb && cb.checked;
+  }).map(org => ({
+    org: org.id,
+    name: org.name,
+    what: (document.getElementById('org-' + org.id + '-what') || {}).value?.trim() || '',
+    how: (document.getElementById('org-' + org.id + '-how') || {}).value?.trim() || ''
+  }));
   return result;
 }
 
