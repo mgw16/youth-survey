@@ -611,12 +611,12 @@ function buildOrgAwareness() {
 }
 
 async function exportPDF() {
-  if (!allResponses.length) { alert('No responses to export.'); return; }
+  if (!allResponses.length) { alert('No responses to generate a report from.'); return; }
   const btn = document.getElementById('exportPdfBtn');
-  btn.textContent = 'Generating PDF...';
+  btn.textContent = 'Building report...';
   btn.disabled = true;
 
-  // Render all charts by briefly showing all sections off-screen
+  // Render all charts off-screen so canvases are populated
   const tabs = document.querySelectorAll('.tab-content');
   tabs.forEach(t => {
     t.style.display = 'block';
@@ -628,15 +628,15 @@ async function exportPDF() {
     t.style.pointerEvents = 'none';
   });
   buildAll();
-  await new Promise(r => setTimeout(r, 1200));
+  await new Promise(r => setTimeout(r, 1400));
 
-  // Capture chart images
+  // Capture all chart canvases
   const imgs = {};
   Object.entries(charts).forEach(([id, chart]) => {
     try { imgs[id] = chart.toBase64Image('image/png', 1.0); } catch(e) {}
   });
 
-  // Restore
+  // Restore tabs
   tabs.forEach(t => {
     t.style.display = 'none';
     t.style.opacity = '';
@@ -648,115 +648,235 @@ async function exportPDF() {
   });
   showTab(currentTab);
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = 210, mg = 16;
-  let y = mg;
-
-  const addPage = () => { doc.addPage(); y = mg; };
-  const H1 = (txt, sz=14) => {
-    doc.setFont('helvetica','bold'); doc.setFontSize(sz); doc.setTextColor(26,31,58);
-    doc.text(txt, mg, y); y += sz*0.45 + 5;
-  };
-  const BODY = (txt, sz=9, color=[107,114,128]) => {
-    doc.setFont('helvetica','normal'); doc.setFontSize(sz); doc.setTextColor(...color);
-    const lines = doc.splitTextToSize(txt, W - mg*2);
-    doc.text(lines, mg, y); y += lines.length*(sz*0.4+0.8) + 3;
-  };
-  const addChart = (id, title, h=65) => {
-    if (!imgs[id]) return;
-    if (y + h + 16 > 280) addPage();
-    H1(title, 11); y += 2;
-    doc.addImage(imgs[id], 'PNG', mg, y, W-mg*2, h);
-    y += h + 10;
-  };
-
-  // Cover
-  doc.setFillColor(26,31,58); doc.rect(0,0,W,65,'F');
-  doc.setFillColor(0,166,81); doc.rect(0,59,W,4,'F');
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
-  doc.text('Youth Engagement Survey', mg, 24);
-  doc.setFontSize(12); doc.setFont('helvetica','normal');
-  doc.text('Results Report', mg, 34);
-  doc.setFontSize(9); doc.setTextColor(200,230,200);
-  doc.text(new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}), mg, 44);
-  doc.text(`${allResponses.length} total responses`, mg, 51);
-
-  y = 80;
-  H1('Key Statistics', 13);
   const n = allResponses.length;
   const leaderPct = n ? Math.round(allResponses.filter(r=>r.q10==='yes_def'||r.q10==='yes_maybe').length/n*100) : 0;
   const avgEff = avg(allResponses,'q6');
   const refs = allResponses.reduce((a,r)=>a+(r.q17_friend_emails?.length||0),0);
-  const statPairs = [['Total Responses',String(n)],['Leader Pipeline',leaderPct+'%'],['Avg Self-Efficacy',avgEff+'/5'],['Friend Referrals',String(refs)]];
-  let sx = mg;
-  statPairs.forEach(([label,val]) => {
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(107,114,128);
-    doc.text(label, sx, y);
-    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(26,31,58);
-    doc.text(val, sx, y+8);
-    sx += 46;
-  });
-  y += 24;
+  const dateStr = new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'});
 
-  // Section 1
-  addPage(); H1('Section 1 — Who Responded', 14); y += 3;
-  addChart('c-age','Age distribution',60);
-  addChart('c-reaction','Emotional reaction to poverty',68);
+  const chartImg = (id, caption) => imgs[id]
+    ? `<figure class="chart-fig"><img src="${imgs[id]}" alt="${caption}"><figcaption>${caption}</figcaption></figure>`
+    : '';
 
-  // Section 2
-  addPage(); H1('Section 2 — Awareness & Knowledge', 14); y += 3;
-  addChart('c-sources','Where young people learn about poverty',72);
-  addChart('c-know','Self-rated knowledge of global poverty',58);
+  const q15s = allResponses.filter(r=>r.q15&&r.q15.length>5);
+  const stories = allResponses.filter(r=>r.q18_story&&r.q18_story.length>5);
+  const orgResponders = allResponses.filter(r=>r.q_orgs&&r.q_orgs.length>0);
+  const orgCounts = {};
+  orgResponders.forEach(r=>r.q_orgs.forEach(o=>{ orgCounts[o.name]=(orgCounts[o.name]||0)+1; }));
+  const orgSorted = Object.entries(orgCounts).sort((a,b)=>b[1]-a[1]);
 
-  // Section 3
-  addPage(); H1('Section 3 — Motivation & Barriers', 14); y += 3;
-  addChart('c-barrier','Biggest barrier to getting involved',60);
-  addChart('c-efficacy','Self-efficacy: belief that their actions matter',58);
-  addChart('c-church','Church / community connection',65);
+  const quoteCards = (items, field) => items.slice(0,15).map(r=>
+    `<div class="quote">"${(r[field]||'').substring(0,280)}${(r[field]||'').length>280?'…':''}"
+     <div class="quote-meta">Age: ${LABELS.q11.map[r.q11]||'—'} · Church: ${r.q12_church_name||r.q12||'—'}</div></div>`).join('');
 
-  // Section 4
-  addPage(); H1('Section 4 — Preferred Actions & Formats', 14); y += 3;
-  addChart('c-actions','Actions young people would consider',72);
-  addChart('c-format','Preferred format for engagement',66);
+  const orgQuals = orgSorted.map(([name]) => {
+    const rs = orgResponders.flatMap(r=>(r.q_orgs||[]).filter(o=>o.name===name&&(o.what||o.how)));
+    if (!rs.length) return '';
+    return `<div class="org-block"><div class="org-name">${name} <span class="org-count">(${orgCounts[name]} recognised)</span></div>
+      ${rs.slice(0,6).map(o=>`<div class="org-response">
+        ${o.what?`<div class="org-label">What they think it does:</div><div class="org-text">"${o.what}"</div>`:''}
+        ${o.how?`<div class="org-label" style="margin-top:6px">How under-18s could engage:</div><div class="org-text">"${o.how}"</div>`:''}
+      </div>`).join('')}
+    </div>`;
+  }).join('');
 
-  // Section 5
-  addPage(); H1('Section 5 — Leadership Interest', 14); y += 3;
-  addChart('c-lead','Interest in shaping programs',60);
-  addChart('c-time','Time available per month',58);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Youth Engagement Survey — Results Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { margin: 15mm 14mm; size: A4; }
+  body { font-family: 'Outfit', sans-serif; color: #1A1F3A; background: white; font-size: 10pt; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  // Open responses
-  addPage(); H1('Open Responses — Q15', 14); y += 3;
-  BODY('"What could aid organisations do to get more young people involved?"', 9, [107,114,128]);
-  y += 2;
-  allResponses.filter(r=>r.q15&&r.q15.length>5).slice(0,12).forEach(r => {
-    if (y > 265) addPage();
-    BODY('"' + r.q15.substring(0,220) + (r.q15.length>220?'...':'"'), 9, [44,44,44]);
-  });
+  /* COVER */
+  .cover { background: #1A1F3A; color: white; padding: 52px 48px 44px; margin: -15mm -14mm 0; page-break-after: always; }
+  .cover-tag { font-size: 9pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #6EE7B7; margin-bottom: 18px; }
+  .cover-title { font-family: 'Lora', serif; font-size: 28pt; font-weight: 700; line-height: 1.15; margin-bottom: 10px; }
+  .cover-title em { color: #6EE7B7; font-style: italic; }
+  .cover-sub { font-size: 11pt; color: rgba(255,255,255,0.6); margin-bottom: 36px; }
+  .cover-bar { height: 3px; background: #00A651; width: 60px; margin-bottom: 36px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  .stat { background: rgba(255,255,255,0.07); border-radius: 10px; padding: 16px 18px; }
+  .stat-val { font-size: 22pt; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+  .stat-label { font-size: 8pt; color: rgba(255,255,255,0.5); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 
-  addPage(); H1('Stories of Hope', 14); y += 3;
-  allResponses.filter(r=>r.q18_story&&r.q18_story.length>5).slice(0,10).forEach(r => {
-    if (y > 265) addPage();
-    BODY('"' + r.q18_story.substring(0,220) + (r.q18_story.length>220?'...':'"'), 9, [44,44,44]);
-  });
+  /* SECTIONS */
+  .section { page-break-before: always; padding-top: 8px; }
+  .section-tag { font-size: 8pt; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #00A651; margin-bottom: 6px; }
+  .section-title { font-family: 'Lora', serif; font-size: 17pt; font-weight: 700; color: #1A1F3A; margin-bottom: 4px; }
+  .section-desc { font-size: 9pt; color: #6B7280; margin-bottom: 22px; }
+  .divider { height: 1px; background: #e5e7eb; margin: 20px 0; }
 
-  // Org awareness
-  const orgResponders = allResponses.filter(r=>r.q_orgs&&r.q_orgs.length);
-  if (orgResponders.length) {
-    addPage(); H1('Organisation Awareness', 14); y += 3;
-    const orgCounts = {};
-    orgResponders.forEach(r => r.q_orgs.forEach(o => { orgCounts[o.name]=(orgCounts[o.name]||0)+1; }));
-    Object.entries(orgCounts).sort((a,b)=>b[1]-a[1]).forEach(([name,count]) => {
-      if (y > 270) addPage();
-      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,31,58);
-      doc.text(name, mg, y);
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(107,114,128);
-      doc.text(`Recognised by ${count} of ${n} respondents`, mg+70, y);
-      y += 8;
-    });
-  }
+  /* CHARTS */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+  .chart-grid.single { grid-template-columns: 1fr; }
+  .chart-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+  .chart-card-title { font-family: 'Lora', serif; font-size: 10pt; font-weight: 700; color: #1A1F3A; margin-bottom: 2px; }
+  .chart-card-sub { font-size: 8pt; color: #6B7280; margin-bottom: 10px; }
+  figure.chart-fig { margin: 0; }
+  figure.chart-fig img { width: 100%; height: auto; display: block; }
+  figure.chart-fig figcaption { display: none; }
 
-  doc.save('youth-survey-report-' + new Date().toISOString().slice(0,10) + '.pdf');
+  /* QUOTES */
+  .quotes-section { }
+  .quote { background: #f0f9f4; border-left: 3px solid #00A651; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 10px; font-size: 9.5pt; color: #1A1F3A; font-style: italic; line-height: 1.55; }
+  .quote-meta { font-size: 8pt; color: #6B7280; margin-top: 5px; font-style: normal; font-weight: 600; }
+
+  /* ORG AWARENESS */
+  .org-bar-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 0.5px solid #e5e7eb; }
+  .org-bar-name { width: 180px; font-size: 9pt; font-weight: 500; flex-shrink: 0; }
+  .org-bar-track { flex: 1; height: 7px; background: #e8f7f0; border-radius: 4px; }
+  .org-bar-fill { height: 100%; background: #00A651; border-radius: 4px; }
+  .org-bar-count { font-size: 9pt; font-weight: 700; color: #007A3D; width: 40px; text-align: right; flex-shrink: 0; }
+  .org-block { margin-bottom: 18px; page-break-inside: avoid; }
+  .org-name { font-family: 'Lora', serif; font-size: 11pt; font-weight: 700; color: #1A1F3A; margin-bottom: 8px; }
+  .org-count { font-size: 9pt; color: #6B7280; font-family: 'Outfit', sans-serif; font-weight: 400; }
+  .org-response { background: #f0f9f4; border-left: 2px solid #00A651; border-radius: 0 6px 6px 0; padding: 8px 12px; margin-bottom: 8px; }
+  .org-label { font-size: 8pt; font-weight: 700; color: #007A3D; margin-bottom: 3px; }
+  .org-text { font-size: 9pt; color: #1A1F3A; font-style: italic; }
+
+  /* FOOTER */
+  @page { @bottom-center { content: "Youth Engagement Survey — ${dateStr}  |  Page " counter(page) " of " counter(pages); font-family: 'Outfit', sans-serif; font-size: 8pt; color: #9CA3AF; } }
+
+  /* PRINT BUTTON */
+  .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #1A1F3A; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 999; }
+  .print-bar-text { color: rgba(255,255,255,0.7); font-size: 13px; }
+  .print-btn { background: #00A651; color: white; border: none; border-radius: 8px; padding: 9px 22px; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .print-btn:hover { background: #007A3D; }
+  @media print { .print-bar { display: none !important; } body { padding-top: 0; } }
+  body { padding-top: 56px; }
+</style>
+</head>
+<body>
+
+<div class="print-bar">
+  <div class="print-bar-text">Your report is ready — click to save as PDF (choose <strong>Save as PDF</strong> in the print dialog)</div>
+  <button class="print-btn" onclick="window.print()">⬇ Save as PDF</button>
+</div>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-tag">Youth Aid Engagement · ${dateStr}</div>
+  <h1 class="cover-title">Youth Engagement<br><em>Survey Report</em></h1>
+  <p class="cover-sub">${n} responses collected · Generated ${dateStr}</p>
+  <div class="cover-bar"></div>
+  <div class="stats-grid">
+    <div class="stat"><div class="stat-val">${n}</div><div class="stat-label">Total Responses</div></div>
+    <div class="stat"><div class="stat-val">${leaderPct}%</div><div class="stat-label">Leader Pipeline</div></div>
+    <div class="stat"><div class="stat-val">${avgEff}/5</div><div class="stat-label">Avg Self-Efficacy</div></div>
+    <div class="stat"><div class="stat-val">${refs}</div><div class="stat-label">Friend Referrals</div></div>
+  </div>
+</div>
+
+<!-- SECTION 1 -->
+<div class="section">
+  <div class="section-tag">Section 1</div>
+  <div class="section-title">Who Responded</div>
+  <div class="section-desc">Age distribution, church connection, and emotional baseline of respondents.</div>
+  <div class="chart-grid">
+    <div class="chart-card"><div class="chart-card-title">Age groups</div><div class="chart-card-sub">Q11</div>${chartImg('c-age','Age groups')}</div>
+    <div class="chart-card"><div class="chart-card-title">Emotional reaction to poverty</div><div class="chart-card-sub">Q3</div>${chartImg('c-reaction','Emotional reaction')}</div>
+    <div class="chart-card"><div class="chart-card-title">Church connection</div><div class="chart-card-sub">Q12</div>${chartImg('c-church','Church connection')}</div>
+    <div class="chart-card"><div class="chart-card-title">Prior involvement with aid</div><div class="chart-card-sub">Q14</div>${chartImg('c-brand','Prior involvement')}</div>
+  </div>
+</div>
+
+<!-- SECTION 2 -->
+<div class="section">
+  <div class="section-tag">Section 2</div>
+  <div class="section-title">Awareness & Knowledge</div>
+  <div class="section-desc">How much young people know about global poverty and where they learn about it.</div>
+  <div class="chart-grid single">
+    <div class="chart-card"><div class="chart-card-title">Where young people learn about poverty</div><div class="chart-card-sub">Q2 — multi-select</div>${chartImg('c-sources','Sources')}</div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card"><div class="chart-card-title">Self-rated knowledge</div><div class="chart-card-sub">Q1 — scale 1–5</div>${chartImg('c-know','Knowledge')}</div>
+    <div class="chart-card"><div class="chart-card-title">Prior involvement with organisations</div><div class="chart-card-sub">Q14</div>${chartImg('c-brand','Prior involvement')}</div>
+  </div>
+</div>
+
+<!-- SECTION 3 -->
+<div class="section">
+  <div class="section-tag">Section 3</div>
+  <div class="section-title">Motivation & Barriers</div>
+  <div class="section-desc">What drives young people to act — and what stops them.</div>
+  <div class="chart-grid">
+    <div class="chart-card"><div class="chart-card-title">Biggest barrier to involvement</div><div class="chart-card-sub">Q5</div>${chartImg('c-barrier','Barriers')}</div>
+    <div class="chart-card"><div class="chart-card-title">Self-efficacy: belief actions matter</div><div class="chart-card-sub">Q6 — scale 1–5</div>${chartImg('c-efficacy','Self-efficacy')}</div>
+  </div>
+</div>
+
+<!-- SECTION 4 -->
+<div class="section">
+  <div class="section-tag">Section 4</div>
+  <div class="section-title">Actions & Preferences</div>
+  <div class="section-desc">What young people would actually do, how they want to engage, and how much time they have.</div>
+  <div class="chart-grid single">
+    <div class="chart-card"><div class="chart-card-title">Actions young people would consider</div><div class="chart-card-sub">Q7 — multi-select</div>${chartImg('c-actions','Actions')}</div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card"><div class="chart-card-title">Preferred format</div><div class="chart-card-sub">Q8</div>${chartImg('c-format','Format')}</div>
+    <div class="chart-card"><div class="chart-card-title">Time available per month</div><div class="chart-card-sub">Q9</div>${chartImg('c-time','Time')}</div>
+  </div>
+</div>
+
+<!-- SECTION 5 -->
+<div class="section">
+  <div class="section-tag">Section 5</div>
+  <div class="section-title">Leadership Interest</div>
+  <div class="section-desc">Young people interested in shaping or leading programs — the future advisory pipeline.</div>
+  <div class="chart-grid single">
+    <div class="chart-card"><div class="chart-card-title">Interest in shaping programs</div><div class="chart-card-sub">Q10</div>${chartImg('c-lead','Leadership interest')}</div>
+  </div>
+</div>
+
+${orgSorted.length ? `
+<!-- SECTION 6 -->
+<div class="section">
+  <div class="section-tag">Section 6</div>
+  <div class="section-title">Organisation Awareness</div>
+  <div class="section-desc">Which organisations young people recognised, and what they think about them.</div>
+  <div class="chart-card" style="margin-bottom:20px">
+    <div class="chart-card-title">Recognition by organisation</div>
+    <div class="chart-card-sub">How many of ${n} respondents had heard of each organisation</div>
+    <div style="margin-top:14px">
+      ${orgSorted.map(([name,cnt])=>`<div class="org-bar-row">
+        <div class="org-bar-name">${name}</div>
+        <div class="org-bar-track"><div class="org-bar-fill" style="width:${Math.round(cnt/n*100)}%"></div></div>
+        <div class="org-bar-count">${cnt} / ${n}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+  ${orgQuals}
+</div>` : ''}
+
+${q15s.length ? `
+<!-- OPEN RESPONSES -->
+<div class="section">
+  <div class="section-tag">Open Responses</div>
+  <div class="section-title">What Could Organisations Do?</div>
+  <div class="section-desc">Q15 — "What's one thing aid organisations could do to get more young people involved?"</div>
+  <div class="quotes-section">${quoteCards(q15s,'q15')}</div>
+</div>` : ''}
+
+${stories.length ? `
+<div class="section">
+  <div class="section-tag">Stories of Hope</div>
+  <div class="section-title">Moments That Stayed With Them</div>
+  <div class="section-desc">Young people's stories about people and moments that gave them hope about poverty and injustice.</div>
+  <div class="quotes-section">${quoteCards(stories,'q18_story')}</div>
+</div>` : ''}
+
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+
   btn.textContent = 'Export PDF Report';
   btn.disabled = false;
 }
