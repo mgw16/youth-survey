@@ -1,6 +1,10 @@
 [build]
-  publish = "."
-  functions = "netlify/functions"
+  command = "npm run build"
+  publish = "dist"
 
-[build.environment]
-  NODE_VERSION = "18"
+# Single-page app: send all routes to index.html.
+# (We use hash routing, so this is mostly belt-and-braces.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
